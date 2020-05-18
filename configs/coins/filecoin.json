@@ -1,0 +1,65 @@
+{
+  "coin": {
+    "name": "Filecoin",
+    "shortcut": "FIL",
+    "label": "Filecoin",
+    "alias": "filecoin"
+  },
+  "ports": {
+    "backend_rpc": 1234,
+    "backend_message_queue": 38348,
+    "blockbook_internal": 9048,
+    "blockbook_public": 9148
+  },
+  "ipc": {
+    "rpc_url_template": "http://127.0.0.1:{{.Ports.BackendRPC}}/rpc/v0",
+    "rpc_user": "rpc",
+    "rpc_pass": "rpc",
+    "rpc_timeout": 25,
+    "message_queue_binding_template": "tcp://127.0.0.1:{{.Ports.BackendMessageQueue}}"
+  },
+  "backend": {
+    "package_name": "backend-filecoin",
+    "package_revision": "openbazaar",
+    "system_user": "filecoin",
+    "version": "0.2.10",
+    "binary_url": "https://github.com/filecoin-project/lotus/releases/download/v0.2.8/lotus_v0.2.8_linux-amd64.tar.gz",
+    "verification_type": "",
+    "verification_source": "",
+    "extract_command": "apt install -y ocl-icd-opencl-dev;tar -C backend --strip 1 -xf",
+    "exclude_files": [],
+    "exec_command_template": "{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/lotus daemon",
+    "logrotate_files_template": "{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/*.log",
+    "postinst_script_template": "",
+    "service_type": "forking",
+    "service_additional_params_template": "",
+    "protect_memory": true,
+    "mainnet": false,
+    "server_config_file": "",
+    "client_config_file": "",
+    "additional_params": {}
+  },
+  "blockbook": {
+    "package_name": "blockbook-filecoin",
+    "system_user": "blockbook-filecoin",
+    "internal_binding_template": ":{{.Ports.BlockbookInternal}}",
+    "public_binding_template": ":{{.Ports.BlockbookPublic}}",
+    "explorer_url": "",
+    "additional_params": "",
+    "block_chain": {
+      "parse": true,
+      "mempool_workers": 8,
+      "mempool_sub_workers": 2,
+      "block_addresses_to_keep": 300,
+      "xpub_magic": 76067358,
+      "xpub_magic_segwit_p2sh": 77429938,
+      "xpub_magic_segwit_native": 78792518,
+      "slip44": 75,
+      "additional_params": {}
+    }
+  },
+  "meta": {
+    "package_maintainer": "OpenBazaar",
+    "package_maintainer_email": "project@openbazaar.org"
+  }
+}
