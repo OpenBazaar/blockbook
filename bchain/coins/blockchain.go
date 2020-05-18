@@ -4,6 +4,7 @@ import (
 	"context"
 	"encoding/json"
 	"fmt"
+	"github.com/trezor/blockbook/bchain/coins/filecoin"
 	"io/ioutil"
 	"math/big"
 	"reflect"
@@ -114,6 +115,8 @@ func init() {
 	BlockChainFactories["Omotenashicoin"] = omotenashicoin.NewOmotenashiCoinRPC
 	BlockChainFactories["Omotenashicoin Testnet"] = omotenashicoin.NewOmotenashiCoinRPC
 	BlockChainFactories["BitZeny"] = bitzeny.NewBitZenyRPC
+	BlockChainFactories["Filecoin"] = filecoin.NewFilecoinRPC
+	BlockChainFactories["Filecoin Testnet"] = filecoin.NewFilecoinRPC
 }
 
 // GetCoinNameFromConfig gets coin name and coin shortcut from config file
