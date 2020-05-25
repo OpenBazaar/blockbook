@@ -1,19 +1,19 @@
 package filecoin
 
 import (
-	"bytes"
-	"encoding/json"
+	"github.com/ethereum/go-ethereum/common/hexutil"
+	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/trezor/blockbook/bchain"
-	"github.com/trezor/blockbook/bchain/coins/btc"
-	"github.com/trezor/blockbook/bchain/coins/utils"
-	"io"
 )
 
 const (
 	MainnetMagic wire.BitcoinNet = 0xf1cfa6d3
 	TestnetMagic wire.BitcoinNet = 0x0d221506
+
+	// FilecoinAmountDecimalPoint defines number of decimal points in Ether amounts
+	FilecoinAmountDecimalPoint = 18
 )
 
 var (
@@ -37,14 +37,18 @@ func init() {
 
 // FilecoinParser handle
 type FilecoinParser struct {
-	*btc.BitcoinParser
+	//*btc.BitcoinParser
+	*bchain.BaseParser
 	Config *Configuration
 }
 
 // NewFilecoinParser returns new DashParser instance
 func NewFilecoinParser(c *Configuration) *FilecoinParser {
 	return &FilecoinParser{
-		//BitcoinParser: btc.NewBitcoinParser(params, c),
+		BaseParser: &bchain.BaseParser{
+			BlockAddressesToKeep: c.BlockAddressesToKeep,
+			AmountDecimalPoint:   FilecoinAmountDecimalPoint,
+		},
 		Config: c,
 	}
 }
@@ -70,82 +74,30 @@ func GetChainParams(chain string) *chaincfg.Params {
 	}
 }
 
-func parseBlockHeader(r io.Reader) (*wire.BlockHeader, error) {
-	h := &wire.BlockHeader{}
-	err := h.Deserialize(r)
-
-	// hash_state_root 32
-	// hash_utxo_root 32
-	// hash_prevout_stake 32
-	// hash_prevout_n 4
-	buf := make([]byte, 100)
-	_, err = io.ReadFull(r, buf)
+func (f *FilecoinParser) filMessageToTx(msg *types.Message, blocktime int64, confirmations uint32) (*bchain.Tx, error) {
+	vs, err := hexutil.DecodeBig(msg.Value.String())
 	if err != nil {
 		return nil, err
 	}
-
-	sigLength, err := wire.ReadVarInt(r, 0)
-	if err != nil {
-		return nil, err
-	}
-	sigBuf := make([]byte, sigLength)
-	_, err = io.ReadFull(r, sigBuf)
-	if err != nil {
-		return nil, err
-	}
-
-	return h, err
-}
-
-func (p *FilecoinParser) ParseBlock(b []byte) (*bchain.Block, error) {
-	r := bytes.NewReader(b)
-	w := wire.MsgBlock{}
-
-	h, err := parseBlockHeader(r)
-	if err != nil {
-		return nil, err
-	}
-
-	err = utils.DecodeTransactions(r, 0, wire.WitnessEncoding, &w)
-	if err != nil {
-		return nil, err
-	}
-
-	txs := make([]bchain.Tx, len(w.Transactions))
-	for ti, t := range w.Transactions {
-		txs[ti] = p.TxFromMsgTx(t, false)
-	}
-
-	return &bchain.Block{
-		BlockHeader: bchain.BlockHeader{
-			Size: len(b),
-			Time: h.Timestamp.Unix(),
+	return &bchain.Tx{
+		Blocktime:     blocktime,
+		Confirmations: confirmations,
+		Time:          blocktime,
+		Txid:          msg.Cid().String(),
+		Vin: []bchain.Vin{
+			{
+				Addresses: []string{msg.From.String()},
+			},
 		},
-		Txs: txs,
+		Vout: []bchain.Vout{
+			{
+				N:        0,
+				ValueSat: *vs,
+				ScriptPubKey: bchain.ScriptPubKey{
+					Addresses: []string{msg.To.String()},
+				},
+			},
+		},
+		CoinSpecificData: msg,
 	}, nil
-}
-
-// ParseTxFromJson parses JSON message containing transaction and returns Tx struct
-func (p *FilecoinParser) ParseTxFromJson(msg json.RawMessage) (*bchain.Tx, error) {
-	var tx bchain.Tx
-	err := json.Unmarshal(msg, &tx)
-	if err != nil {
-		return nil, err
-	}
-
-	for i := range tx.Vout {
-		vout := &tx.Vout[i]
-		// convert vout.JsonValue to big.Int and clear it, it is only temporary value used for unmarshal
-		vout.ValueSat, err = p.AmountToBigInt(vout.JsonValue)
-		if err != nil {
-			return nil, err
-		}
-		vout.JsonValue = ""
-
-		if vout.ScriptPubKey.Addresses == nil {
-			vout.ScriptPubKey.Addresses = []string{}
-		}
-	}
-
-	return &tx, nil
 }
