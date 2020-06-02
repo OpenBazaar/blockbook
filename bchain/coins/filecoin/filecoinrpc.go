@@ -37,7 +37,7 @@ type FilecoinRPC struct {
 	*bchain.BaseChain
 	fullNode *apistruct.FullNodeStruct
 
-	Parser             *FilecoinParser
+	Parser             bchain.BlockChainParser
 	Testnet            bool
 	Network            string
 	ChainConfig        *Configuration
@@ -56,11 +56,14 @@ func NewFilecoinRPC(config json.RawMessage, pushHandler func(bchain.Notification
 	if err != nil {
 		return nil, err
 	}
+	parser := NewFilecoinParser(&cfg)
 
 	return &FilecoinRPC{
 		ChainConfig: &cfg,
-		Parser:      NewFilecoinParser(&cfg),
-		BaseChain:   &bchain.BaseChain{},
+		Parser:      parser,
+		BaseChain: &bchain.BaseChain{
+			Parser: parser,
+		},
 		pushHandler: pushHandler,
 		shutdown:    make(chan struct{}),
 	}, nil
@@ -316,7 +319,7 @@ func (f *FilecoinRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 		return nil, err
 	}
 	// TODO: Figure out how to get the blocktime and height
-	return f.Parser.filMessageToTx(message, 0, 0)
+	return f.Parser.(*FilecoinParser).filMessageToTx(message, 0, 0)
 }
 
 func (f *FilecoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
