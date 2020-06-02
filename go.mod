@@ -7,7 +7,6 @@ require (
 	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200224203130-895b4c57c44d // indirect
 	github.com/bsm/go-vlq v0.0.0-20150828105119-ec6e8d4f5f4e
-	github.com/btcsuite/btcd v0.20.1-beta // indirect
 	github.com/deckarep/golang-set v1.7.1
 	github.com/decred/dcrd/chaincfg v1.5.2
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.2
@@ -34,16 +33,12 @@ require (
 	github.com/martinboehm/btcd v0.0.0-20200313230603-83af86142d93
 	github.com/martinboehm/btcutil v0.0.0-20200229134221-d7706467ae8f
 	github.com/martinboehm/golang-socketio v0.0.0-20180414165752-f60b0a8befde
-	github.com/mr-tron/base58 v1.1.3 // indirect
 	github.com/multiformats/go-multiaddr v0.2.1
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pebbe/zmq4 v1.0.0
 	github.com/prometheus/client_golang v1.5.1
-	github.com/prometheus/common v0.9.1 // indirect
 	github.com/prometheus/procfs v0.0.10 // indirect
-	github.com/rs/cors v1.7.0 // indirect
 	github.com/schancel/cashaddr-converter v0.0.0-20180113210041-0a38f5822f79
-	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tecbot/gorocksdb v0.0.0-20180907100951-214b6b7bc0f0
 	github.com/textileio/powergate v0.0.0-20200518201853-3e2460699e71
 	golang.org/x/crypto v0.0.0-20200427165652-729f1e841bcc

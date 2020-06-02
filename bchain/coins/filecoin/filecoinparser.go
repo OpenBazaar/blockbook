@@ -1,11 +1,12 @@
 package filecoin
 
 import (
-	"github.com/ethereum/go-ethereum/common/hexutil"
+	faddr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/trezor/blockbook/bchain"
+	"math/big"
 )
 
 const (
@@ -53,6 +54,11 @@ func NewFilecoinParser(c *Configuration) *FilecoinParser {
 	}
 }
 
+// GetChainType is type of the blockchain
+func (f *FilecoinParser) GetChainType() bchain.ChainType {
+	return bchain.ChainEthereumType
+}
+
 // GetChainParams contains network parameters for the main Qtum network,
 // the regression test Qtum network, the test Qtum network and
 // the simulation test Qtum network, in this order
@@ -75,10 +81,7 @@ func GetChainParams(chain string) *chaincfg.Params {
 }
 
 func (f *FilecoinParser) filMessageToTx(msg *types.Message, blocktime int64, confirmations uint32) (*bchain.Tx, error) {
-	vs, err := hexutil.DecodeBig(msg.Value.String())
-	if err != nil {
-		return nil, err
-	}
+	vs, _ := new(big.Int).SetString(msg.Value.String(), 10)
 	return &bchain.Tx{
 		Blocktime:     blocktime,
 		Confirmations: confirmations,
@@ -100,4 +103,35 @@ func (f *FilecoinParser) filMessageToTx(msg *types.Message, blocktime int64, con
 		},
 		CoinSpecificData: msg,
 	}, nil
+}
+
+// GetAddrDescFromAddress returns internal address representation of given address
+func (f *FilecoinParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
+	addr, err := faddr.NewFromString(address)
+	if err != nil {
+		return nil, err
+	}
+	return addr.Marshal()
+}
+
+// GetAddrDescFromVout returns internal address representation of given transaction output
+func (f *FilecoinParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.AddressDescriptor, error) {
+	if len(output.ScriptPubKey.Addresses) != 1 {
+		return nil, bchain.ErrAddressMissing
+	}
+	return f.GetAddrDescFromAddress(output.ScriptPubKey.Addresses[0])
+}
+
+// GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
+func (f *FilecoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
+	var addr faddr.Address
+	if err := addr.Unmarshal(addrDesc); err != nil {
+		return nil, false, err
+	}
+	return []string{addr.String()}, true, nil
+}
+
+// GetScriptFromAddrDesc returns output script for given address descriptor
+func (f *FilecoinParser) GetScriptFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]byte, error) {
+	return addrDesc, nil
 }
