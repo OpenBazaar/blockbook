@@ -13,6 +13,7 @@ import (
 	"github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/api/apistruct"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/filecoin-project/specs-actors/actors/abi"
 	"github.com/golang/glog"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multiaddr"
@@ -20,6 +21,8 @@ import (
 	"github.com/textileio/powergate/lotus"
 	"github.com/trezor/blockbook/bchain"
 	"math/big"
+	"os"
+	"path"
 	"strconv"
 	"sync"
 )
@@ -69,8 +72,10 @@ func NewFilecoinRPC(config json.RawMessage, pushHandler func(bchain.Notification
 		return nil, err
 	}
 	parser := NewFilecoinParser(&cfg)
+	p := path.Join(cfg.DataPath, "filecoin")
+	os.MkdirAll(p, os.ModePerm)
 
-	db, err := badger.Open(badger.DefaultOptions(cfg.DataPath))
+	db, err := badger.Open(badger.DefaultOptions(p))
 	if err != nil {
 		return nil, err
 	}
@@ -308,9 +313,30 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 	})
 	f.dbMtx.Unlock()
 	if err != nil {
-		return "", err
+		tipSet, err := f.fullNode.ChainHead(context.Background())
+		if err != nil {
+			return "", nil
+		}
+		// This call is very expensive. Only do for less than 6000 from tip.
+		if uint32(tipSet.Height()) - height < 6000 {
+			tipSet, err := f.fullNode.ChainGetTipSetByHeight(context.Background(), abi.ChainEpoch(height), types.EmptyTSK)
+			if err != nil {
+				return "", nil
+			}
+			f.dbMtx.Lock()
+			err = f.db.Update(func(tx *badger.Txn) error {
+				key := make([]byte, 8)
+				binary.BigEndian.PutUint64(key, uint64(height))
+				return tx.Set(key, tipSet.Key().Bytes())
+			})
+			f.dbMtx.Unlock()
+			if err != nil {
+				return "", err
+			}
+			return hex.EncodeToString(tipSet.Key().Bytes()), nil
+		}
+		return "", fmt.Errorf("tipset not found for height %d", height)
 	}
-
 	return hex.EncodeToString(key.Bytes()), nil
 }
 
