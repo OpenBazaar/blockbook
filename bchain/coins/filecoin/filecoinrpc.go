@@ -3,7 +3,7 @@ package filecoin
 import (
 	"bytes"
 	"context"
-	"crypto/rand"
+	"crypto/sha256"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -17,7 +17,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/multiformats/go-multihash"
 	"github.com/textileio/powergate/lotus"
 	"github.com/trezor/blockbook/bchain"
 	"math/big"
@@ -151,14 +150,11 @@ func (f *FilecoinRPC) Initialize() error {
 				for h > uint64(tipSet.Height()) {
 					key := make([]byte, 8)
 					binary.BigEndian.PutUint64(key, h)
-					nilTs, err := createNilTipsetKey()
-					if err != nil {
+					nilTs := createNilTipsetKey(h)
+					if err :=tx.Set(key, nilTs); err != nil {
 						return err
 					}
-					if err :=tx.Set(key, nilTs.Bytes()); err != nil {
-						return err
-					}
-					if err :=tx.Set(nilTs.Bytes(), key); err != nil {
+					if err :=tx.Set(nilTs, key); err != nil {
 						return err
 					}
 					h--
@@ -279,7 +275,7 @@ func (f *FilecoinRPC) GetBestBlockHash() (string, error) {
 		return "", err
 	}
 
-	return hex.EncodeToString(tipSet.Key().Bytes()), nil
+	return hex.EncodeToString(hashTipsetKey(tipSet.Key())), nil
 }
 
 func (f *FilecoinRPC) GetBestBlockHeight() (uint32, error) {
@@ -295,7 +291,7 @@ func (f *FilecoinRPC) GetBestBlockHeight() (uint32, error) {
 }
 
 func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
-	var key types.TipSetKey
+	var blockHash string
 	f.dbMtx.Lock()
 	err := f.db.View(func(tx *badger.Txn) error {
 		heightBytes := make([]byte, 8)
@@ -308,8 +304,16 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 		if err != nil {
 			return err
 		}
-		key, err = types.TipSetKeyFromBytes(tsBytes)
-		return err
+		if isNilTipsetKey(tsBytes) {
+			blockHash = hex.EncodeToString(tsBytes)
+		} else {
+			tsk, err := types.TipSetKeyFromBytes(tsBytes)
+			if err != nil {
+				return err
+			}
+			blockHash = hex.EncodeToString(hashTipsetKey(tsk))
+		}
+		return nil
 	})
 	f.dbMtx.Unlock()
 	if err != nil {
@@ -333,11 +337,11 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 			if err != nil {
 				return "", err
 			}
-			return hex.EncodeToString(tipSet.Key().Bytes()), nil
+			return hex.EncodeToString(hashTipsetKey(tipSet.Key())), nil
 		}
 		return "", fmt.Errorf("tipset not found for height %d", height)
 	}
-	return hex.EncodeToString(key.Bytes()), nil
+	return blockHash, nil
 }
 
 func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
@@ -346,22 +350,18 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 		return nil, err
 	}
 
-	tipSet, err := types.TipSetKeyFromBytes(tipSetBytes)
-	if err != nil {
-		return nil, err
-	}
-
 	var (
 		height uint64
-		parents types.TipSetKey
+		parents string
 		timestamp uint64
+		size int
 	)
-	if isNilTipsetKey(tipSet) {
+	if isNilTipsetKey(tipSetBytes) {
 		f.dbMtx.Lock()
 		err := f.db.View(func(tx *badger.Txn) error {
-			data, err := tx.Get(tipSet.Bytes())
+			data, err := tx.Get(tipSetBytes)
 			if err != nil {
-				return fmt.Errorf("error fetching tipset from db %s: %s", hex.EncodeToString(tipSet.Bytes()), err)
+				return fmt.Errorf("error fetching tipset from db %s: %s", hex.EncodeToString(tipSetBytes), err)
 			}
 			heightBytes, err := data.ValueCopy(nil)
 			if err != nil {
@@ -374,26 +374,19 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 		if err != nil {
 			return nil, err
 		}
-		prevHash, err := f.GetBlockHash(uint32(height) - 1)
+		parents, err = f.GetBlockHash(uint32(height) - 1)
 		if err != nil {
 			glog.Warningf("GetBlockHeader: Failed to load prev block hash %s", err)
 		}
-		prevBytes, err := hex.DecodeString(prevHash)
-		if err != nil {
-			return nil, err
-		}
-		parents, err = types.TipSetKeyFromBytes(prevBytes)
-		if err != nil {
-			return nil, err
-		}
 	} else {
-		ts, err := f.fullNode.ChainGetTipSet(context.Background(), tipSet)
+		ts, err := f.fullNode.ChainGetTipSet(context.Background(), types.EmptyTSK)
 		if err != nil {
 			return nil, err
 		}
 		height = uint64(ts.Height())
-		parents = ts.Parents()
+		parents = hex.EncodeToString(hashTipsetKey(ts.Parents()))
 		timestamp = ts.Blocks()[0].Timestamp
+		size = len(ts.Cids())
 	}
 
 	bestHeight, err := f.GetBestBlockHeight()
@@ -410,10 +403,10 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 		Height:        uint32(height),
 		Time:          int64(timestamp),
 		Hash:          hash,
-		Prev:          hex.EncodeToString(parents.Bytes()),
+		Prev:          parents,
 		Confirmations: int(bestHeight - uint32(height) + 1),
 		Next:          nextHash,
-		Size:          len(tipSet.Cids()),
+		Size:          size,
 	}
 	return ret, nil
 }
@@ -428,32 +421,39 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		if err != nil {
 			return nil, err
 		}
-	} else {
-		f.dbMtx.Lock()
-		err = f.db.View(func(tx *badger.Txn) error {
-			heightBytes := make([]byte, 8)
-			binary.LittleEndian.PutUint64(heightBytes, uint64(height))
-			data, err := tx.Get(heightBytes)
-			if err != nil {
-				return err
-			}
-			tipSetBytes, err = data.ValueCopy(nil)
-			if err != nil {
-				return err
-			}
-			return nil
-		})
-		f.dbMtx.Unlock()
+		info, err := f.GetBlockHeader(hash)
 		if err != nil {
 			return nil, err
 		}
+		height = info.Height
 	}
-	tipSetKey, err := types.TipSetKeyFromBytes(tipSetBytes)
+	f.dbMtx.Lock()
+	err = f.db.View(func(tx *badger.Txn) error {
+		heightBytes := make([]byte, 8)
+		binary.LittleEndian.PutUint64(heightBytes, uint64(height))
+		data, err := tx.Get(heightBytes)
+		if err != nil {
+			return err
+		}
+		tipSetBytes, err = data.ValueCopy(nil)
+		if err != nil {
+			return err
+		}
+		return nil
+	})
+	f.dbMtx.Unlock()
 	if err != nil {
 		return nil, err
 	}
+
 	msgMap := make(map[cid.Cid]struct{})
-	if !isNilTipsetKey(tipSetKey) {
+	if !isNilTipsetKey(tipSetBytes) {
+		tipSetKey, err := types.TipSetKeyFromBytes(tipSetBytes)
+		if err != nil {
+			return nil, err
+		}
+		hash = hex.EncodeToString(hashTipsetKey(tipSetKey))
+
 		tipSet, err := f.fullNode.ChainGetTipSet(context.Background(), tipSetKey)
 		if err != nil {
 			return nil, err
@@ -470,7 +470,7 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		}
 	}
 
-	header, err := f.GetBlockHeader(hex.EncodeToString(tipSetKey.Bytes()))
+	header, err := f.GetBlockHeader(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -501,12 +501,12 @@ func (f *FilecoinRPC) GetBlockInfo(hash string) (*bchain.BlockInfo, error) {
 	if err != nil {
 		return nil, err
 	}
-	tipSetKey, err := types.TipSetKeyFromBytes(tipSetBytes)
-	if err != nil {
-		return nil, err
-	}
 	msgMap := make(map[cid.Cid]struct{})
-	if !isNilTipsetKey(tipSetKey) {
+	if !isNilTipsetKey(tipSetBytes) {
+		tipSetKey, err := types.TipSetKeyFromBytes(tipSetBytes)
+		if err != nil {
+			return nil, err
+		}
 		tipSet, err := f.fullNode.ChainGetTipSet(context.Background(), tipSetKey)
 		if err != nil {
 			return nil, err
@@ -523,7 +523,7 @@ func (f *FilecoinRPC) GetBlockInfo(hash string) (*bchain.BlockInfo, error) {
 		}
 	}
 
-	header, err := f.GetBlockHeader(hex.EncodeToString(tipSetKey.Bytes()))
+	header, err := f.GetBlockHeader(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -616,34 +616,20 @@ func (f *FilecoinRPC) SendRawTransaction(tx string) (string, error) {
 	return id.String(), nil
 }
 
-func createNilTipsetKey() (types.TipSetKey, error) {
-	mh, err  := multihash.Encode(make([]byte, 32), multihash.SHA2_256)
-	if err != nil {
-		return types.TipSetKey{}, err
-	}
-	nilID := cid.NewCidV0(mh)
-
-	r := make([]byte, 32)
-	rand.Read(r)
-	mh2, err  := multihash.Encode(r, multihash.SHA2_256)
-	if err != nil {
-		return types.TipSetKey{}, err
-	}
-	randID := cid.NewCidV0(mh2)
-
-	return types.NewTipSetKey(nilID, randID), nil
+func hashTipsetKey(tsk types.TipSetKey) []byte {
+	h := sha256.Sum256(tsk.Bytes())
+	return h[:]
 }
 
-func isNilTipsetKey(tsk types.TipSetKey) bool {
-	mh, err  := multihash.Encode(make([]byte, 32), multihash.SHA2_256)
-	if err != nil {
-		return false
-	}
-	if len(tsk.Cids()) > 0 {
+func createNilTipsetKey(height uint64) []byte {
+	h := make([]byte, 8)
+	binary.BigEndian.PutUint64(h, height)
 
-		if bytes.Equal(tsk.Cids()[0].Hash(), mh){
-			return true
-		}
-	}
-	return false
+	z := make([]byte, 24)
+	return append(z, h...)
+}
+
+func isNilTipsetKey(tsk []byte) bool {
+	z := make([]byte, 24)
+	return bytes.Equal(z, tsk[:24])
 }
