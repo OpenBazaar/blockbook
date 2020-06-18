@@ -364,10 +364,12 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 		err := f.db.View(func(tx *badger.Txn) error {
 			data, err := tx.Get(hashBytes)
 			if err != nil {
+				glog.Errorf("***", 1, hash)
 				return fmt.Errorf("error fetching tipset from db %s: %s", hex.EncodeToString(hashBytes), err)
 			}
 			heightBytes, err := data.ValueCopy(nil)
 			if err != nil {
+				glog.Errorf("***", 2, hash)
 				return err
 			}
 			height = binary.BigEndian.Uint64(heightBytes)
@@ -375,6 +377,7 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 		})
 		f.dbMtx.Unlock()
 		if err != nil {
+			glog.Errorf("***", 3, height)
 			return nil, err
 		}
 		parents, err = f.GetBlockHash(uint32(height) - 1)
@@ -387,24 +390,29 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 		err := f.db.View(func(tx *badger.Txn) error {
 			data, err := tx.Get(hashBytes)
 			if err != nil {
+				glog.Errorf("***", 4, hash)
 				return fmt.Errorf("error fetching tipset key from db %s: %s", hash, err)
 			}
 			tipSetBytes, err := data.ValueCopy(nil)
 			if err != nil {
+				glog.Errorf("***", 5, hash)
 				return err
 			}
 			tipSetKey, err = types.TipSetKeyFromBytes(tipSetBytes)
 			if err != nil {
+				glog.Errorf("***", 6, hash)
 				return err
 			}
 			return nil
 		})
 		f.dbMtx.Unlock()
 		if err != nil {
+			glog.Errorf("***", 7, hash)
 			return nil, err
 		}
 		ts, err := f.fullNode.ChainGetTipSet(context.Background(), tipSetKey)
 		if err != nil {
+			glog.Errorf("***", 8, hash)
 			return nil, err
 		}
 		height = uint64(ts.Height())
@@ -415,12 +423,16 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 
 	bestHeight, err := f.GetBestBlockHeight()
 	if err != nil {
+		glog.Errorf("***", 9, height)
 		return nil, err
 	}
 
-	nextHash, err := f.GetBlockHash(uint32(height) + 1)
-	if err != nil {
-		glog.Warningf("GetBlockHeader: Failed to load next block hash %s", err)
+	var nextHash string
+	if uint64(bestHeight) != height {
+		nextHash, err = f.GetBlockHash(uint32(height) + 1)
+		if err != nil {
+			glog.Warningf("GetBlockHeader: Failed to load next block hash %s", err)
+		}
 	}
 
 	ret := &bchain.BlockHeader{
