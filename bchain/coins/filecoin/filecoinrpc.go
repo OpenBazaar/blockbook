@@ -163,6 +163,9 @@ func (f *FilecoinRPC) Initialize() error {
 			height = uint64(tipSet.Height())
 			key := make([]byte, 8)
 			binary.BigEndian.PutUint64(key, height)
+			if err := tx.Set(hashTipsetKey(tipSet.Key()), tipSet.Key().Bytes()); err != nil {
+				return err
+			}
 			return tx.Set(key, tipSet.Key().Bytes())
 		})
 		f.dbMtx.Unlock()
@@ -345,7 +348,7 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 }
 
 func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
-	tipSetBytes, err := hex.DecodeString(hash)
+	hashBytes, err := hex.DecodeString(hash)
 	if err != nil {
 		return nil, err
 	}
@@ -356,12 +359,12 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 		timestamp uint64
 		size int
 	)
-	if isNilTipsetKey(tipSetBytes) {
+	if isNilTipsetKey(hashBytes) {
 		f.dbMtx.Lock()
 		err := f.db.View(func(tx *badger.Txn) error {
-			data, err := tx.Get(tipSetBytes)
+			data, err := tx.Get(hashBytes)
 			if err != nil {
-				return fmt.Errorf("error fetching tipset from db %s: %s", hex.EncodeToString(tipSetBytes), err)
+				return fmt.Errorf("error fetching tipset from db %s: %s", hex.EncodeToString(hashBytes), err)
 			}
 			heightBytes, err := data.ValueCopy(nil)
 			if err != nil {
@@ -379,7 +382,28 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 			glog.Warningf("GetBlockHeader: Failed to load prev block hash %s", err)
 		}
 	} else {
-		ts, err := f.fullNode.ChainGetTipSet(context.Background(), types.EmptyTSK)
+		var tipSetKey types.TipSetKey
+		f.dbMtx.Lock()
+		err := f.db.View(func(tx *badger.Txn) error {
+			data, err := tx.Get(hashBytes)
+			if err != nil {
+				return fmt.Errorf("error fetching tipset key from db %s: %s", hash, err)
+			}
+			tipSetBytes, err := data.ValueCopy(nil)
+			if err != nil {
+				return err
+			}
+			tipSetKey, err = types.TipSetKeyFromBytes(tipSetBytes)
+			if err != nil {
+				return err
+			}
+			return nil
+		})
+		f.dbMtx.Unlock()
+		if err != nil {
+			return nil, err
+		}
+		ts, err := f.fullNode.ChainGetTipSet(context.Background(), tipSetKey)
 		if err != nil {
 			return nil, err
 		}
@@ -414,6 +438,7 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
 	var (
 		tipSetBytes []byte
+		header *bchain.BlockHeader
 		err         error
 	)
 	if hash != "" {
@@ -421,16 +446,17 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		if err != nil {
 			return nil, err
 		}
-		info, err := f.GetBlockHeader(hash)
+		header, err = f.GetBlockHeader(hash)
 		if err != nil {
 			return nil, err
 		}
-		height = info.Height
+		height = header.Height
 	}
+	glog.Infof("Indexing block %d", height)
 	f.dbMtx.Lock()
 	err = f.db.View(func(tx *badger.Txn) error {
 		heightBytes := make([]byte, 8)
-		binary.LittleEndian.PutUint64(heightBytes, uint64(height))
+		binary.BigEndian.PutUint64(heightBytes, uint64(height))
 		data, err := tx.Get(heightBytes)
 		if err != nil {
 			return err
@@ -470,9 +496,11 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		}
 	}
 
-	header, err := f.GetBlockHeader(hash)
-	if err != nil {
-		return nil, err
+	if header == nil {
+		header, err = f.GetBlockHeader(hash)
+		if err != nil {
+			return nil, err
+		}
 	}
 
 	// TODO: this seems like an inefficient way to get the block txs. Is there an
