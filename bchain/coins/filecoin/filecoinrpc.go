@@ -17,6 +17,7 @@ import (
 	"github.com/golang/glog"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multiaddr"
+	"github.com/prometheus/common/log"
 	"github.com/textileio/powergate/lotus"
 	"github.com/trezor/blockbook/bchain"
 	"math/big"
@@ -320,6 +321,7 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 	})
 	f.dbMtx.Unlock()
 	if err != nil {
+		log.Info("Fetching block hash for height %s")
 		tipSet, err := f.fullNode.ChainHead(context.Background())
 		if err != nil {
 			return "", nil
@@ -460,7 +462,7 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		}
 		header, err = f.GetBlockHeader(hash)
 		if err != nil {
-			return nil, err
+			return nil, bchain.ErrBlockNotFound
 		}
 		height = header.Height
 	}
@@ -481,7 +483,7 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	})
 	f.dbMtx.Unlock()
 	if err != nil {
-		return nil, err
+		return nil, bchain.ErrBlockNotFound
 	}
 
 	msgMap := make(map[cid.Cid]struct{})
