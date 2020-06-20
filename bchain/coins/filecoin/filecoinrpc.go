@@ -139,6 +139,20 @@ func (f *FilecoinRPC) Initialize() error {
 	}
 	height, startHeight = uint64(tipSet.Height()), uint64(tipSet.Height())
 
+	f.dbMtx.Lock()
+	err = f.db.Update(func(tx *badger.Txn) error {
+		key := make([]byte, 8)
+		binary.BigEndian.PutUint64(key, height)
+		if err := tx.Set(hashTipsetKey(tipSet.Key()), tipSet.Key().Bytes()); err != nil {
+			return err
+		}
+		return tx.Set(key, tipSet.Key().Bytes())
+	})
+	f.dbMtx.Unlock()
+	if err != nil {
+		return err
+	}
+
 	for height > headHeight {
 		tipSet, err = f.fullNode.ChainGetTipSet(context.Background(), tipSet.Parents())
 		if err != nil {
