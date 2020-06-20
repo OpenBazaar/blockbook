@@ -60,7 +60,7 @@ func NewFilecoinParser(c *Configuration) *FilecoinParser {
 
 // GetChainType is type of the blockchain
 func (f *FilecoinParser) GetChainType() bchain.ChainType {
-	return bchain.ChainEthereumType
+	return bchain.ChainBitcoinType
 }
 
 // GetChainParams contains network parameters for the main Qtum network,
