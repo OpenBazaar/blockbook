@@ -17,7 +17,6 @@ import (
 	"github.com/golang/glog"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multiaddr"
-	"github.com/prometheus/common/log"
 	"github.com/textileio/powergate/lotus"
 	"github.com/trezor/blockbook/bchain"
 	"math/big"
@@ -95,7 +94,7 @@ func NewFilecoinRPC(config json.RawMessage, pushHandler func(bchain.Notification
 
 // initialize the block chain connector
 func (f *FilecoinRPC) Initialize() error {
-	ma, err := multiaddr.NewMultiaddr("/ip4/167.71.92.113/tcp/1235")
+	ma, err := multiaddr.NewMultiaddr("/ip4/161.35.106.168/tcp/1234")
 	if err != nil {
 		return err
 	}
@@ -335,29 +334,36 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 	})
 	f.dbMtx.Unlock()
 	if err != nil {
-		log.Info("Fetching block hash for height %s")
+		glog.Infof("Fetching block hash for height %d", height)
 		tipSet, err := f.fullNode.ChainHead(context.Background())
 		if err != nil {
+			fmt.Println("^^^1", err)
 			return "", nil
 		}
 		// This call is very expensive. Only do for less than 6000 from tip.
 		if uint32(tipSet.Height()) - height < 6000 {
 			tipSet, err := f.fullNode.ChainGetTipSetByHeight(context.Background(), abi.ChainEpoch(height), types.EmptyTSK)
 			if err != nil {
+				fmt.Println("^^^2", err)
 				return "", nil
 			}
 			f.dbMtx.Lock()
 			err = f.db.Update(func(tx *badger.Txn) error {
 				key := make([]byte, 8)
 				binary.BigEndian.PutUint64(key, uint64(height))
+				if err := tx.Set(hashTipsetKey(tipSet.Key()), tipSet.Key().Bytes()); err != nil {
+					return err
+				}
 				return tx.Set(key, tipSet.Key().Bytes())
 			})
 			f.dbMtx.Unlock()
 			if err != nil {
+				fmt.Println("^^^4", err)
 				return "", err
 			}
 			return hex.EncodeToString(hashTipsetKey(tipSet.Key())), nil
 		}
+		fmt.Println("^^^3", ">6000")
 		return "", fmt.Errorf("tipset not found for height %d", height)
 	}
 	return blockHash, nil
@@ -463,10 +469,12 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	if hash != "" {
 		tipSetBytes, err = hex.DecodeString(hash)
 		if err != nil {
+			fmt.Println("***1", hash, height, err)
 			return nil, err
 		}
 		header, err = f.GetBlockHeader(hash)
 		if err != nil {
+			fmt.Println("***2", hash, height, err)
 			return nil, bchain.ErrBlockNotFound
 		}
 		height = header.Height
@@ -477,10 +485,12 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		binary.BigEndian.PutUint64(heightBytes, uint64(height))
 		data, err := tx.Get(heightBytes)
 		if err != nil {
+			fmt.Println("***3", hash, height, err)
 			return err
 		}
 		tipSetBytes, err = data.ValueCopy(nil)
 		if err != nil {
+			fmt.Println("***4", hash, height, err)
 			return err
 		}
 		return nil
@@ -494,18 +504,21 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	if !isNilTipsetKey(tipSetBytes) {
 		tipSetKey, err := types.TipSetKeyFromBytes(tipSetBytes)
 		if err != nil {
+			fmt.Println("***5", hash, height, err)
 			return nil, err
 		}
 		hash = hex.EncodeToString(hashTipsetKey(tipSetKey))
 
 		tipSet, err := f.fullNode.ChainGetTipSet(context.Background(), tipSetKey)
 		if err != nil {
+			fmt.Println("***6", hash, height, err)
 			return nil, err
 		}
 
 		for _, id := range tipSet.Cids() {
 			blockMessages, err := f.fullNode.ChainGetBlockMessages(context.Background(), id)
 			if err != nil {
+				fmt.Println("***7", hash, height, err)
 				return nil, err
 			}
 			for _, c := range blockMessages.Cids {
@@ -517,6 +530,7 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	if header == nil {
 		header, err = f.GetBlockHeader(hash)
 		if err != nil {
+			fmt.Println("***8", hash, height, err)
 			return nil, err
 		}
 	}
@@ -527,8 +541,12 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	for id := range msgMap {
 		tx, err := f.GetTransaction(id.String())
 		if err != nil {
+			fmt.Println("***9", hash, height, err)
 			return nil, err
 		}
+		tx.BlockHeight = height
+		tx.Blocktime = header.Time
+		tx.Time = header.Time
 		txs = append(txs, *tx)
 
 		if f.mempoolInitialized {
@@ -625,8 +643,7 @@ func (f *FilecoinRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	// TODO: Figure out how to get the blocktime and height
-	return f.Parser.(*FilecoinParser).filMessageToTx(message, 0, 0)
+	return f.Parser.(*FilecoinParser).filMessageToTx(message)
 }
 
 func (f *FilecoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
