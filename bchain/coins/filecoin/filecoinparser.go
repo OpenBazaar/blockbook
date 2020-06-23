@@ -60,7 +60,7 @@ func NewFilecoinParser(c *Configuration) *FilecoinParser {
 
 // GetChainType is type of the blockchain
 func (f *FilecoinParser) GetChainType() bchain.ChainType {
-	return bchain.ChainBitcoinType
+	return bchain.ChainEthereumType
 }
 
 // GetChainParams contains network parameters for the main Qtum network,
@@ -84,13 +84,11 @@ func GetChainParams(chain string) *chaincfg.Params {
 	}
 }
 
-func (f *FilecoinParser) filMessageToTx(msg *types.Message, blocktime int64, confirmations uint32) (*bchain.Tx, error) {
+func (f *FilecoinParser) filMessageToTx(msg *types.Message) (*bchain.Tx, error) {
 	vs, _ := new(big.Int).SetString(msg.Value.String(), 10)
 	return &bchain.Tx{
-		Blocktime:     blocktime,
-		Confirmations: confirmations,
-		Time:          blocktime,
 		Txid:          msg.Cid().String(),
+		Version:       int32(msg.Version),
 		Vin: []bchain.Vin{
 			{
 				Addresses: []string{msg.From.String()},
