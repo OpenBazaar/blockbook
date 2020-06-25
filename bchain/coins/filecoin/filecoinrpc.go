@@ -200,8 +200,6 @@ func (f *FilecoinRPC) Initialize() error {
 		return err
 	}
 
-	// TODO: how do we subscribe to pending transactions from the full node?
-
 	go func() {
 		for {
 			select {
@@ -243,6 +241,23 @@ func (f *FilecoinRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 	f.Mempool.OnNewTxAddr = onNewTxAddr
 
 	f.mempoolInitialized = true
+
+	mempoolChan, err := f.fullNode.MpoolSub(context.Background())
+	if err != nil {
+		return err
+	}
+
+	go func() {
+		for {
+			select {
+			case tx := <-mempoolChan:
+				f.Mempool.AddTransactionToMempool(tx.Message.Message.Cid().String())
+				f.pushHandler(bchain.NotificationNewTx)
+			case <-f.shutdown:
+				return
+			}
+		}
+	}()
 
 	return nil
 }
@@ -341,7 +356,7 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 			return "", nil
 		}
 		// This call is very expensive. Only do for less than 6000 from tip.
-		if uint32(tipSet.Height()) - height < 6000 {
+		if int32(tipSet.Height()) - int32(height) < 6000 {
 			tipSet, err := f.fullNode.ChainGetTipSetByHeight(context.Background(), abi.ChainEpoch(height), types.EmptyTSK)
 			if err != nil {
 				fmt.Println("^^^2", err)
@@ -363,7 +378,7 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 			}
 			return hex.EncodeToString(hashTipsetKey(tipSet.Key())), nil
 		}
-		fmt.Println("^^^3", ">6000")
+		fmt.Println("^^^3", ">6000", tipSet.Height(), height)
 		return "", fmt.Errorf("tipset not found for height %d", height)
 	}
 	return blockHash, nil
@@ -478,6 +493,11 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 			return nil, bchain.ErrBlockNotFound
 		}
 		height = header.Height
+	} else {
+		hash, err = f.GetBlockHash(height)
+		if err != nil {
+			glog.Warningf("Error querying for bock hash at height %d", height)
+		}
 	}
 	f.dbMtx.Lock()
 	err = f.db.View(func(tx *badger.Txn) error {
