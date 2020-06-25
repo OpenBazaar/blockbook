@@ -695,6 +695,20 @@ func (f *FilecoinRPC) EstimateSmartFee(blocks int, conservative bool) (big.Int, 
 	return *fee.Int, nil
 }
 
+func (f *FilecoinRPC) EthereumTypeGetBalance(addrDesc bchain.AddressDescriptor) (*big.Int, error) {
+	strAddress, err := address.NewFromString(string(addrDesc))
+	if err != nil {
+		return nil, err
+	}
+
+	balance, err := f.fullNode.WalletBalance(context.Background(), strAddress)
+	if err != nil {
+		return nil, err
+	}
+
+	return balance.Int, nil
+}
+
 func (f *FilecoinRPC) EstimateFee(blocks int) (big.Int, error) {
 	return f.EstimateSmartFee(blocks, true)
 }
