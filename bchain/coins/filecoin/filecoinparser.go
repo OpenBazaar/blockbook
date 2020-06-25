@@ -2,15 +2,14 @@ package filecoin
 
 import (
 	"encoding/hex"
-	faddr "github.com/filecoin-project/go-address"
 	"github.com/filecoin-project/lotus/chain/types"
+	"github.com/gogo/protobuf/proto"
 	"github.com/ipfs/go-cid"
 	"github.com/juju/errors"
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/trezor/blockbook/bchain"
 	"math/big"
-	"github.com/gogo/protobuf/proto"
 )
 
 const (
@@ -109,11 +108,7 @@ func (f *FilecoinParser) filMessageToTx(msg *types.Message) (*bchain.Tx, error) 
 
 // GetAddrDescFromAddress returns internal address representation of given address
 func (f *FilecoinParser) GetAddrDescFromAddress(address string) (bchain.AddressDescriptor, error) {
-	addr, err := faddr.NewFromString(address)
-	if err != nil {
-		return nil, err
-	}
-	return addr.Marshal()
+	return []byte(address), nil
 }
 
 // GetAddrDescFromVout returns internal address representation of given transaction output
@@ -126,11 +121,7 @@ func (f *FilecoinParser) GetAddrDescFromVout(output *bchain.Vout) (bchain.Addres
 
 // GetAddressesFromAddrDesc returns addresses for given address descriptor with flag if the addresses are searchable
 func (f *FilecoinParser) GetAddressesFromAddrDesc(addrDesc bchain.AddressDescriptor) ([]string, bool, error) {
-	var addr faddr.Address
-	if err := addr.Unmarshal(addrDesc); err != nil {
-		return nil, false, err
-	}
-	return []string{addr.String()}, true, nil
+	return []string{string(addrDesc)}, true, nil
 }
 
 // GetScriptFromAddrDesc returns output script for given address descriptor
