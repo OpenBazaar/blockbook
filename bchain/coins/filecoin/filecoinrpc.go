@@ -3,7 +3,7 @@ package filecoin
 import (
 	"bytes"
 	"context"
-	"crypto/sha256"
+	"crypto/sha512"
 	"encoding/binary"
 	"encoding/hex"
 	"encoding/json"
@@ -722,20 +722,29 @@ func (f *FilecoinRPC) SendRawTransaction(tx string) (string, error) {
 	return id.String(), nil
 }
 
+// EthereumTypeGetNonce returns current balance of an address
+func (f *FilecoinRPC) EthereumTypeGetNonce(addrDesc bchain.AddressDescriptor) (uint64, error) {
+	return 0, nil
+}
+
+func (f *FilecoinRPC) EthereumTypeGetErc20ContractInfo(contractDesc bchain.AddressDescriptor) (*bchain.Erc20Contract, error) {
+	return nil, nil
+}
+
 func hashTipsetKey(tsk types.TipSetKey) []byte {
-	h := sha256.Sum256(tsk.Bytes())
-	return h[:]
+	h := sha512.Sum512(tsk.Bytes())
+	return h[:39]
 }
 
 func createNilTipsetKey(height uint64) []byte {
 	h := make([]byte, 8)
 	binary.BigEndian.PutUint64(h, height)
 
-	z := make([]byte, 24)
+	z := make([]byte, 31)
 	return append(z, h...)
 }
 
 func isNilTipsetKey(tsk []byte) bool {
-	z := make([]byte, 24)
-	return bytes.Equal(z, tsk[:24])
+	z := make([]byte, 31)
+	return bytes.Equal(z, tsk[:31])
 }
