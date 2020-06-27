@@ -57,7 +57,7 @@ type FilecoinRPC struct {
 	mempoolInitialized bool
 	pushHandler        func(notificationType bchain.NotificationType)
 
-	db *badger.DB
+	db    *badger.DB
 	dbMtx sync.Mutex
 
 	shutdown chan struct{}
@@ -104,7 +104,7 @@ func (f *FilecoinRPC) Initialize() error {
 		return err
 	}
 
-	fullNode, close, err := lotus.New(ma, f.ChainConfig.RPCAuthToken)
+	fullNode, close, err := lotus.New(ma, f.ChainConfig.RPCAuthToken, 3)
 	if err != nil {
 		return err
 	}
@@ -164,16 +164,16 @@ func (f *FilecoinRPC) Initialize() error {
 		}
 		f.dbMtx.Lock()
 		err := f.db.Update(func(tx *badger.Txn) error {
-			if uint64(tipSet.Height()) < height - 1 {
+			if uint64(tipSet.Height()) < height-1 {
 				h := height - 1
 				for h > uint64(tipSet.Height()) {
 					key := make([]byte, 8)
 					binary.BigEndian.PutUint64(key, h)
 					nilTs := createNilTipsetKey(h)
-					if err :=tx.Set(key, nilTs); err != nil {
+					if err := tx.Set(key, nilTs); err != nil {
 						return err
 					}
-					if err :=tx.Set(nilTs, key); err != nil {
+					if err := tx.Set(nilTs, key); err != nil {
 						return err
 					}
 					h--
@@ -360,7 +360,7 @@ func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
 			return "", nil
 		}
 		// This call is very expensive. Only do for less than 6000 from tip.
-		if int32(tipSet.Height()) - int32(height) < 6000 {
+		if int32(tipSet.Height())-int32(height) < 6000 {
 			tipSet, err := f.fullNode.ChainGetTipSetByHeight(context.Background(), abi.ChainEpoch(height), types.EmptyTSK)
 			if err != nil {
 				return "", nil
@@ -392,10 +392,10 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 	}
 
 	var (
-		height uint64
-		parents string
+		height    uint64
+		parents   string
 		timestamp uint64
-		size int
+		size      int
 	)
 	if isNilTipsetKey(hashBytes) {
 		f.dbMtx.Lock()
@@ -479,7 +479,7 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error) {
 	var (
 		tipSetBytes []byte
-		header *bchain.BlockHeader
+		header      *bchain.BlockHeader
 		err         error
 	)
 	if hash != "" {
