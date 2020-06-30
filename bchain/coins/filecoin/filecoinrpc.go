@@ -9,8 +9,10 @@ import (
 	"encoding/json"
 	"errors"
 	"fmt"
+	"github.com/cenkalti/backoff/v3"
 	"github.com/dgraph-io/badger/v2"
 	"github.com/filecoin-project/go-address"
+	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/apistruct"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/filecoin-project/specs-actors/actors/abi"
@@ -25,6 +27,7 @@ import (
 	"strconv"
 	"strings"
 	"sync"
+	"time"
 )
 
 const (
@@ -111,10 +114,7 @@ func (f *FilecoinRPC) Initialize() error {
 	f.fullNode = fullNode
 	f.close = close
 
-	chainChan, err := fullNode.ChainNotify(context.Background())
-	if err != nil {
-		return err
-	}
+	chainChan := f.subscribeChain()
 
 	var startHeight, height, headHeight uint64
 	f.dbMtx.Lock()
@@ -208,8 +208,11 @@ func (f *FilecoinRPC) Initialize() error {
 	go func() {
 		for {
 			select {
-			case <-chainChan:
+			case _, ok := <-chainChan:
 				f.pushHandler(bchain.NotificationNewBlock)
+				if !ok {
+					chainChan = f.subscribeChain()
+				}
 			case <-f.shutdown:
 				return
 			}
@@ -247,17 +250,19 @@ func (f *FilecoinRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 
 	f.mempoolInitialized = true
 
-	mempoolChan, err := f.fullNode.MpoolSub(context.Background())
-	if err != nil {
-		return err
-	}
+	mempoolChan := f.subscribeMempool()
 
 	go func() {
 		for {
 			select {
-			case tx := <-mempoolChan:
-				f.Mempool.AddTransactionToMempool(tx.Message.Message.Cid().String())
-				f.pushHandler(bchain.NotificationNewTx)
+			case tx, closed := <-mempoolChan:
+				if tx.Message != nil {
+					f.Mempool.AddTransactionToMempool(tx.Message.Message.Cid().String())
+					f.pushHandler(bchain.NotificationNewTx)
+				}
+				if closed {
+					mempoolChan = f.subscribeMempool()
+				}
 			case <-f.shutdown:
 				return
 			}
@@ -265,6 +270,44 @@ func (f *FilecoinRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 	}()
 
 	return nil
+}
+
+func (f *FilecoinRPC) subscribeMempool() <-chan api.MpoolUpdate {
+	bo := backoff.NewExponentialBackOff()
+	for {
+		mempoolChan, err := f.fullNode.MpoolSub(context.Background())
+		if err != nil {
+			glog.Errorf("Error connecting to filecoin mempool subscription: %s", err)
+		} else {
+			return mempoolChan
+		}
+
+		select {
+		case <-time.After(bo.NextBackOff()):
+			continue
+		case <-f.shutdown:
+			return nil
+		}
+	}
+}
+
+func (f *FilecoinRPC) subscribeChain() <-chan []*api.HeadChange {
+	bo := backoff.NewExponentialBackOff()
+	for {
+		chainChan, err := f.fullNode.ChainNotify(context.Background())
+		if err != nil {
+			glog.Errorf("Error connecting to filecoin chain subscription: %s", err)
+		} else {
+			return chainChan
+		}
+
+		select {
+		case <-time.After(bo.NextBackOff()):
+			continue
+		case <-f.shutdown:
+			return nil
+		}
+	}
 }
 
 // shutdown mempool, ZeroMQ and block chain connections
