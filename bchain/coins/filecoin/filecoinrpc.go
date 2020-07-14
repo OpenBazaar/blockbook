@@ -776,18 +776,18 @@ func (f *FilecoinRPC) EthereumTypeGetErc20ContractInfo(contractDesc bchain.Addre
 
 func hashTipsetKey(tsk types.TipSetKey) []byte {
 	h := sha512.Sum512(tsk.Bytes())
-	return h[:39]
+	return h[:38]
 }
 
 func createNilTipsetKey(height uint64) []byte {
 	h := make([]byte, 8)
 	binary.BigEndian.PutUint64(h, height)
 
-	z := make([]byte, 31)
+	z := make([]byte, 30)
 	return append(z, h...)
 }
 
 func isNilTipsetKey(tsk []byte) bool {
-	z := make([]byte, 31)
-	return bytes.Equal(z, tsk[:31])
+	z := make([]byte, 30)
+	return bytes.Equal(z, tsk[:30])
 }
