@@ -131,7 +131,7 @@ func (f *FilecoinParser) GetScriptFromAddrDesc(addrDesc bchain.AddressDescriptor
 
 // PackedTxidLen returns length in bytes of packed txid
 func (f *FilecoinParser) PackedTxidLen() int {
-	return 39
+	return 38
 }
 
 // PackTx packs transaction to byte array using protobuf
