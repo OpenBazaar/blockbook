@@ -594,8 +594,16 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	// TODO: this seems like an inefficient way to get the block txs. Is there an
 	// API call to get everything at once?
 	txs := make([]bchain.Tx, 0, len(msgMap))
+	heightBytes := make([]byte, 8)
+	binary.BigEndian.PutUint64(heightBytes, uint64(height))
+
+	bestHeight, err := f.GetBestBlockHeight()
+	if err != nil {
+		return nil, err
+	}
+
 	for id := range msgMap {
-		tx, err := f.GetTransaction(id.String())
+		tx, err := f.getTransaction(id.String(), bestHeight)
 		if err != nil {
 			return nil, err
 		}
@@ -606,6 +614,14 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 
 		if f.mempoolInitialized {
 			f.Mempool.RemoveTransactionFromMempool(tx.Txid)
+		}
+		f.dbMtx.Lock()
+		err = f.db.Update(func(tx *badger.Txn) error {
+			return tx.Set(id.Bytes(), heightBytes)
+		})
+		f.dbMtx.Unlock()
+		if err != nil {
+			return nil, bchain.ErrBlockNotFound
 		}
 	}
 	blk := &bchain.Block{
@@ -690,6 +706,14 @@ func (f *FilecoinRPC) GetMempoolTransactions() ([]string, error) {
 }
 
 func (f *FilecoinRPC) GetTransaction(txid string) (*bchain.Tx, error) {
+	height, err := f.GetBestBlockHeight()
+	if err != nil {
+		return nil, err
+	}
+	return f.getTransaction(txid, height)
+}
+
+func (f *FilecoinRPC) getTransaction(txid string, chainHeight uint32) (*bchain.Tx, error) {
 	h, err := cid.Decode(txid)
 	if err != nil {
 		return nil, err
@@ -698,7 +722,26 @@ func (f *FilecoinRPC) GetTransaction(txid string) (*bchain.Tx, error) {
 	if err != nil {
 		return nil, err
 	}
-	return f.Parser.(*FilecoinParser).filMessageToTx(message)
+	f.dbMtx.Lock()
+	var height uint64
+	err = f.db.View(func(dbtx *badger.Txn) error {
+		data, err := dbtx.Get(h.Bytes())
+		if err == nil {
+			heightBytes, err := data.ValueCopy(nil)
+			if err == nil {
+				height = binary.BigEndian.Uint64(heightBytes)
+			}
+		}
+		return nil
+	})
+	f.dbMtx.Unlock()
+	tx, err := f.Parser.(*FilecoinParser).filMessageToTx(message)
+	if err != nil {
+		return nil, err
+	}
+	tx.BlockHeight = uint32(height)
+	tx.Confirmations = chainHeight - tx.BlockHeight + 1
+	return tx, nil
 }
 
 func (f *FilecoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) {
