@@ -595,7 +595,9 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	// API call to get everything at once?
 	txs := make([]bchain.Tx, 0, len(msgMap))
 	heightBytes := make([]byte, 8)
+	blockTimeBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(heightBytes, uint64(height))
+	binary.BigEndian.PutUint64(heightBytes, uint64(header.Time))
 
 	bestHeight, err := f.GetBestBlockHeight()
 	if err != nil {
@@ -617,7 +619,7 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		}
 		f.dbMtx.Lock()
 		err = f.db.Update(func(tx *badger.Txn) error {
-			return tx.Set(id.Bytes(), heightBytes)
+			return tx.Set(id.Bytes(), append(heightBytes, blockTimeBytes...))
 		})
 		f.dbMtx.Unlock()
 		if err != nil {
@@ -723,13 +725,17 @@ func (f *FilecoinRPC) getTransaction(txid string, chainHeight uint32) (*bchain.T
 		return nil, err
 	}
 	f.dbMtx.Lock()
-	var height uint64
+	var (
+		height uint64
+		blockTime uint64
+	)
 	err = f.db.View(func(dbtx *badger.Txn) error {
 		data, err := dbtx.Get(h.Bytes())
 		if err == nil {
-			heightBytes, err := data.ValueCopy(nil)
+			respBytes, err := data.ValueCopy(nil)
 			if err == nil {
-				height = binary.BigEndian.Uint64(heightBytes)
+				height = binary.BigEndian.Uint64(respBytes[:8])
+				blockTime = binary.BigEndian.Uint64(respBytes[8:])
 			}
 		}
 		return nil
@@ -741,6 +747,7 @@ func (f *FilecoinRPC) getTransaction(txid string, chainHeight uint32) (*bchain.T
 	}
 	tx.BlockHeight = uint32(height)
 	tx.Confirmations = chainHeight - tx.BlockHeight + 1
+	tx.Blocktime = int64(blockTime)
 
 	ser, err := message.Serialize()
 	if err != nil {
