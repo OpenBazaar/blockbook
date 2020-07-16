@@ -597,7 +597,7 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	heightBytes := make([]byte, 8)
 	blockTimeBytes := make([]byte, 8)
 	binary.BigEndian.PutUint64(heightBytes, uint64(height))
-	binary.BigEndian.PutUint64(heightBytes, uint64(header.Time))
+	binary.BigEndian.PutUint64(blockTimeBytes, uint64(header.Time))
 
 	bestHeight, err := f.GetBestBlockHeight()
 	if err != nil {
