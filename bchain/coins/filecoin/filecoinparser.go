@@ -90,6 +90,7 @@ func (f *FilecoinParser) filMessageToTx(msg *types.Message) (*bchain.Tx, error) 
 		Version: int32(msg.Version),
 		Vin: []bchain.Vin{
 			{
+				Txid: msg.Cid().String(),
 				Addresses: []string{msg.From.String()},
 			},
 		},
