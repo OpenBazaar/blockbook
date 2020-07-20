@@ -506,13 +506,16 @@ func (f *FilecoinRPC) GetBlockHeader(hash string) (*bchain.BlockHeader, error) {
 			glog.Warningf("GetBlockHeader: Failed to load next block hash %s", err)
 		}
 	}
-
+	conf := 0
+	if bestHeight > 0 {
+		conf = int(bestHeight - uint32(height) + 1)
+	}
 	ret := &bchain.BlockHeader{
 		Height:        uint32(height),
 		Time:          int64(timestamp),
 		Hash:          hash,
 		Prev:          parents,
-		Confirmations: int(bestHeight - uint32(height) + 1),
+		Confirmations: conf,
 		Next:          nextHash,
 		Size:          size,
 	}
@@ -745,8 +748,13 @@ func (f *FilecoinRPC) getTransaction(txid string, chainHeight uint32) (*bchain.T
 	if err != nil {
 		return nil, err
 	}
+
+	conf := uint32(0)
+	if height > 0 {
+		conf = chainHeight - uint32(height) + 1
+	}
 	tx.BlockHeight = uint32(height)
-	tx.Confirmations = chainHeight - tx.BlockHeight + 1
+	tx.Confirmations = conf
 	tx.Blocktime = int64(blockTime)
 
 	ser, err := message.Serialize()
@@ -762,18 +770,7 @@ func (f *FilecoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) 
 }
 
 func (f *FilecoinRPC) GetTransactionSpecific(tx *bchain.Tx) (json.RawMessage, error) {
-	csd, ok := tx.CoinSpecificData.(map[string]interface{})
-	if !ok {
-		ntx, err := f.GetTransaction(tx.Txid)
-		if err != nil {
-			return nil, err
-		}
-		csd, ok = ntx.CoinSpecificData.(map[string]interface{})
-		if !ok {
-			return nil, errors.New("cannot get CoinSpecificData")
-		}
-	}
-	m, err := json.Marshal(csd)
+	m, err := json.Marshal(tx.CoinSpecificData)
 	return json.RawMessage(m), err
 }
 
