@@ -722,7 +722,7 @@ func (f *FilecoinRPC) getTransaction(txid string, chainHeight uint32) (*bchain.T
 	}
 	message, err := f.fullNode.ChainGetMessage(context.Background(), h)
 	if err != nil {
-		return nil, err
+		return nil, bchain.ErrTxNotFound
 	}
 	f.dbMtx.Lock()
 	var (
@@ -741,7 +741,7 @@ func (f *FilecoinRPC) getTransaction(txid string, chainHeight uint32) (*bchain.T
 		return nil
 	})
 	f.dbMtx.Unlock()
-	tx, err := f.Parser.(*FilecoinParser).filMessageToTx(message)
+	tx, err := f.Parser.(*FilecoinParser).filMessageToTx(message, height)
 	if err != nil {
 		return nil, err
 	}
@@ -762,18 +762,18 @@ func (f *FilecoinRPC) GetTransactionForMempool(txid string) (*bchain.Tx, error) 
 }
 
 func (f *FilecoinRPC) GetTransactionSpecific(tx *bchain.Tx) (json.RawMessage, error) {
-	csd, ok := tx.CoinSpecificData.(*types.Message)
+	csd, ok := tx.CoinSpecificData.(map[string]interface{})
 	if !ok {
 		ntx, err := f.GetTransaction(tx.Txid)
 		if err != nil {
 			return nil, err
 		}
-		csd, ok = ntx.CoinSpecificData.(*types.Message)
+		csd, ok = ntx.CoinSpecificData.(map[string]interface{})
 		if !ok {
 			return nil, errors.New("cannot get CoinSpecificData")
 		}
 	}
-	m, err := json.Marshal(&csd)
+	m, err := json.Marshal(csd)
 	return json.RawMessage(m), err
 }
 
