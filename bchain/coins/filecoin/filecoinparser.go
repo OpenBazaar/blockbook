@@ -2,6 +2,7 @@ package filecoin
 
 import (
 	"encoding/hex"
+	"fmt"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gogo/protobuf/proto"
 	"github.com/ipfs/go-cid"
@@ -9,6 +10,7 @@ import (
 	"github.com/martinboehm/btcd/wire"
 	"github.com/martinboehm/btcutil/chaincfg"
 	"github.com/trezor/blockbook/bchain"
+	"github.com/trezor/blockbook/bchain/coins/eth"
 	"math/big"
 )
 
@@ -59,7 +61,7 @@ func NewFilecoinParser(c *Configuration) *FilecoinParser {
 
 // GetChainType is type of the blockchain
 func (f *FilecoinParser) GetChainType() bchain.ChainType {
-	return bchain.ChainBitcoinType
+	return bchain.ChainEthereumType
 }
 
 // GetChainParams contains network parameters for the main Qtum network,
@@ -83,14 +85,14 @@ func GetChainParams(chain string) *chaincfg.Params {
 	}
 }
 
-func (f *FilecoinParser) filMessageToTx(msg *types.Message) (*bchain.Tx, error) {
+func (f *FilecoinParser) filMessageToTx(msg *types.Message, height uint64) (*bchain.Tx, error) {
 	vs, _ := new(big.Int).SetString(msg.Value.String(), 10)
-	return &bchain.Tx{
+	tx := &bchain.Tx{
 		Txid:    msg.Cid().String(),
 		Version: int32(msg.Version),
 		Vin: []bchain.Vin{
 			{
-				Txid: msg.Cid().String(),
+				Txid: "",
 				Addresses: []string{msg.From.String()},
 			},
 		},
@@ -103,8 +105,9 @@ func (f *FilecoinParser) filMessageToTx(msg *types.Message) (*bchain.Tx, error) 
 				},
 			},
 		},
-		CoinSpecificData: msg,
-	}, nil
+	}
+	eth.PackHeightInTx(tx, height)
+	return tx, nil
 }
 
 // GetAddrDescFromAddress returns internal address representation of given address
@@ -135,6 +138,10 @@ func (f *FilecoinParser) PackedTxidLen() int {
 	return 38
 }
 
+func (f *FilecoinParser) GetAddrDescForUnknownInput(tx *bchain.Tx, index int) bchain.AddressDescriptor {
+	return []byte(tx.Vin[0].Addresses[0])
+}
+
 // PackTx packs transaction to byte array using protobuf
 func (f *FilecoinParser) PackTx(tx *bchain.Tx, height uint32, blockTime int64) ([]byte, error) {
 	var err error
@@ -144,17 +151,12 @@ func (f *FilecoinParser) PackTx(tx *bchain.Tx, height uint32, blockTime int64) (
 		if err != nil {
 			return nil, errors.Annotatef(err, "Vin %v Hex %v", i, vi.ScriptSig.Hex)
 		}
-		// coinbase txs do not have Vin.txid
-		itxid, err := f.PackTxid(vi.Txid)
-		if err != nil && err != bchain.ErrTxidMissing {
-			return nil, errors.Annotatef(err, "Vin %v Txid %v", i, vi.Txid)
-		}
+
 		pti[i] = &bchain.ProtoTransaction_VinType{
 			Addresses:    vi.Addresses,
 			Coinbase:     vi.Coinbase,
 			ScriptSigHex: hex,
 			Sequence:     vi.Sequence,
-			Txid:         itxid,
 			Vout:         vi.Vout,
 		}
 	}
@@ -193,18 +195,16 @@ func (f *FilecoinParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 	var pt bchain.ProtoTransaction
 	err := proto.Unmarshal(buf, &pt)
 	if err != nil {
+		fmt.Println("a")
 		return nil, 0, err
 	}
 	txid, err := f.UnpackTxid(pt.Txid)
 	if err != nil {
+		fmt.Println("b")
 		return nil, 0, err
 	}
 	vin := make([]bchain.Vin, len(pt.Vin))
 	for i, pti := range pt.Vin {
-		itxid, err := f.UnpackTxid(pti.Txid)
-		if err != nil {
-			return nil, 0, err
-		}
 		vin[i] = bchain.Vin{
 			Addresses: pti.Addresses,
 			Coinbase:  pti.Coinbase,
@@ -212,7 +212,6 @@ func (f *FilecoinParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 				Hex: hex.EncodeToString(pti.ScriptSigHex),
 			},
 			Sequence: pti.Sequence,
-			Txid:     itxid,
 			Vout:     pti.Vout,
 		}
 	}
