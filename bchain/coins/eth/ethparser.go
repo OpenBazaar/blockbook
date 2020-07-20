@@ -443,6 +443,14 @@ func GetHeightFromTx(tx *bchain.Tx) (uint32, error) {
 	return uint32(n), nil
 }
 
+func PackHeightInTx(tx *bchain.Tx, height uint64) {
+	tx.CoinSpecificData = completeTransaction{
+		Tx: &rpcTransaction{
+			BlockNumber: hexutil.EncodeUint64(uint64(height)),
+		},
+	}
+}
+
 // EthereumTypeGetErc20FromTx returns Erc20 data from bchain.Tx
 func (p *EthereumParser) EthereumTypeGetErc20FromTx(tx *bchain.Tx) ([]bchain.Erc20Transfer, error) {
 	var r []bchain.Erc20Transfer
