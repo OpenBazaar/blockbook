@@ -20,13 +20,14 @@ require (
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
 	github.com/filecoin-project/go-address v0.0.2-0.20200504173055-8b6f2fb2b3ef
-	github.com/filecoin-project/lotus v0.4.0
-	github.com/filecoin-project/specs-actors v0.6.2-0.20200617175406-de392ca14121
+	github.com/filecoin-project/lotus v0.4.2-0.20200707004538-0a696f356696
+	github.com/filecoin-project/specs-actors v0.6.2-0.20200702170846-2cd72643a5cf
 	github.com/gobuffalo/packr v1.13.7
 	github.com/gogo/protobuf v1.2.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
 	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.2
+	github.com/ipfs/go-cid v0.0.6
 	github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8 // indirect
 	github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b // indirect
@@ -40,7 +41,7 @@ require (
 	github.com/prometheus/client_golang v1.6.0
 	github.com/schancel/cashaddr-converter v0.0.0-20180113210041-0a38f5822f79
 	github.com/tecbot/gorocksdb v0.0.0-20180907100951-214b6b7bc0f0
-	github.com/textileio/powergate v0.0.1-beta.10
+	github.com/textileio/powergate v0.2.1
 	golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
