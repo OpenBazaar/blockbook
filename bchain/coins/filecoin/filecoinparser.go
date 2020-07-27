@@ -2,7 +2,6 @@ package filecoin
 
 import (
 	"encoding/hex"
-	"fmt"
 	"github.com/filecoin-project/lotus/chain/types"
 	"github.com/gogo/protobuf/proto"
 	"github.com/ipfs/go-cid"
@@ -57,6 +56,16 @@ func NewFilecoinParser(c *Configuration) *FilecoinParser {
 		},
 		Config: c,
 	}
+}
+
+// AmountToDecimalString converts amount in big.Int to string with decimal point in the correct place
+func (f *FilecoinParser) AmountToDecimalString(a *big.Int) string {
+	return bchain.AmountToDecimalString(a, f.AmountDecimalPoint)
+}
+
+// AmountDecimals returns number of decimal places in amounts
+func (f *FilecoinParser) AmountDecimals() int {
+	return f.AmountDecimalPoint
 }
 
 // GetChainType is type of the blockchain
@@ -195,12 +204,10 @@ func (f *FilecoinParser) UnpackTx(buf []byte) (*bchain.Tx, uint32, error) {
 	var pt bchain.ProtoTransaction
 	err := proto.Unmarshal(buf, &pt)
 	if err != nil {
-		fmt.Println("a")
 		return nil, 0, err
 	}
 	txid, err := f.UnpackTxid(pt.Txid)
 	if err != nil {
-		fmt.Println("b")
 		return nil, 0, err
 	}
 	vin := make([]bchain.Vin, len(pt.Vin))
