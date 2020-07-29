@@ -756,6 +756,7 @@ func (f *FilecoinRPC) getTransaction(txid string, chainHeight uint32) (*bchain.T
 	tx.BlockHeight = uint32(height)
 	tx.Confirmations = conf
 	tx.Blocktime = int64(blockTime)
+	tx.Txid = txid
 
 	ser, err := message.Serialize()
 	if err != nil {
