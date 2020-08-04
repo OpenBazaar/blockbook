@@ -257,7 +257,7 @@ func (f *FilecoinRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 			select {
 			case tx, closed := <-mempoolChan:
 				if tx.Message != nil {
-					f.Mempool.AddTransactionToMempool(tx.Message.Message.Cid().String())
+					f.Mempool.AddTransactionToMempool(tx.Message.Cid().String())
 					f.pushHandler(bchain.NotificationNewTx)
 				}
 				if closed {
@@ -756,6 +756,7 @@ func (f *FilecoinRPC) getTransaction(txid string, chainHeight uint32) (*bchain.T
 	tx.BlockHeight = uint32(height)
 	tx.Confirmations = conf
 	tx.Blocktime = int64(blockTime)
+	tx.Time = time.Now().Unix()
 	tx.Txid = txid
 
 	ser, err := message.Serialize()
