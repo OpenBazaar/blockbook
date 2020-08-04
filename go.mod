@@ -7,22 +7,27 @@ require (
 	github.com/allegro/bigcache v1.2.1 // indirect
 	github.com/aristanetworks/goarista v0.0.0-20200224203130-895b4c57c44d // indirect
 	github.com/bsm/go-vlq v0.0.0-20150828105119-ec6e8d4f5f4e
-	github.com/btcsuite/btcd v0.20.1-beta // indirect
+	github.com/cenkalti/backoff/v3 v3.0.0
 	github.com/deckarep/golang-set v1.7.1
 	github.com/decred/dcrd/chaincfg v1.5.2
 	github.com/decred/dcrd/chaincfg/chainhash v1.0.2
 	github.com/decred/dcrd/dcrjson v1.2.0
 	github.com/decred/dcrd/hdkeychain v1.1.1
 	github.com/decred/dcrd/txscript v1.1.0
+	github.com/dgraph-io/badger/v2 v2.0.3
 	github.com/ethereum/go-ethereum v1.8.20
 	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
+	github.com/filecoin-project/go-address v0.0.2-0.20200504173055-8b6f2fb2b3ef
+	github.com/filecoin-project/lotus v0.4.2-0.20200707004538-0a696f356696
+	github.com/filecoin-project/specs-actors v0.6.2-0.20200702170846-2cd72643a5cf
 	github.com/gobuffalo/packr v1.13.7
-	github.com/gogo/protobuf v1.1.1
+	github.com/gogo/protobuf v1.3.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
-	github.com/golang/protobuf v1.3.2
+	github.com/golang/protobuf v1.4.2
 	github.com/gorilla/websocket v1.4.2
+	github.com/ipfs/go-cid v0.0.6
 	github.com/juju/errors v0.0.0-20170703010042-c7d06af17c68
 	github.com/juju/loggo v0.0.0-20190526231331-6e530bcce5d8 // indirect
 	github.com/juju/testing v0.0.0-20191001232224-ce9dec17d28b // indirect
@@ -30,17 +35,14 @@ require (
 	github.com/martinboehm/btcd v0.0.0-20200313230603-83af86142d93
 	github.com/martinboehm/btcutil v0.0.0-20200229134221-d7706467ae8f
 	github.com/martinboehm/golang-socketio v0.0.0-20180414165752-f60b0a8befde
-	github.com/mr-tron/base58 v1.1.3 // indirect
+	github.com/multiformats/go-multiaddr v0.2.2
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
 	github.com/pebbe/zmq4 v1.0.0
-	github.com/prometheus/client_golang v1.1.0
-	github.com/prometheus/common v0.9.1 // indirect
-	github.com/prometheus/procfs v0.0.10 // indirect
-	github.com/rs/cors v1.7.0 // indirect
+	github.com/prometheus/client_golang v1.6.0
 	github.com/schancel/cashaddr-converter v0.0.0-20180113210041-0a38f5822f79
-	github.com/syndtr/goleveldb v1.0.0 // indirect
 	github.com/tecbot/gorocksdb v0.0.0-20180907100951-214b6b7bc0f0
-	golang.org/x/crypto v0.0.0-20190927123631-a832865fa7ad
+	github.com/textileio/powergate v0.2.1
+	golang.org/x/crypto v0.0.0-20200604202706-70a84ac30bf9
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
 	gopkg.in/natefinch/npipe.v2 v2.0.0-20160621034901-c1b8fa8bdcce // indirect
