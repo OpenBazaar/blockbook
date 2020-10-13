@@ -53,7 +53,7 @@ func (m *MempoolFilecoinType) createTxEntry(txid string, txTime uint32) (txEntry
 	}
 	for _, input := range tx.Vin {
 		for i, a := range input.Addresses {
-			addrIndexes = appendAddress(addrIndexes, ^int32(i), a, parser)
+			addrIndexes, _ = appendAddress(addrIndexes, ^int32(i), a, parser)
 		}
 	}
 	t, err := parser.EthereumTypeGetErc20FromTx(tx)
@@ -61,8 +61,8 @@ func (m *MempoolFilecoinType) createTxEntry(txid string, txTime uint32) (txEntry
 		glog.Error("GetErc20FromTx for tx ", txid, ", ", err)
 	} else {
 		for i := range t {
-			addrIndexes = appendAddress(addrIndexes, ^int32(i+1), t[i].From, parser)
-			addrIndexes = appendAddress(addrIndexes, int32(i+1), t[i].To, parser)
+			addrIndexes, _ = appendAddress(addrIndexes, ^int32(i+1), t[i].From, parser)
+			addrIndexes, _ = appendAddress(addrIndexes, int32(i+1), t[i].To, parser)
 		}
 	}
 	if m.OnNewTxAddr != nil {

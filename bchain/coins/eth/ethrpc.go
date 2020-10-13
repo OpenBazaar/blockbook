@@ -11,6 +11,7 @@ import (
 
 	ethereum "github.com/ethereum/go-ethereum"
 	ethcommon "github.com/ethereum/go-ethereum/common"
+	"github.com/ethereum/go-ethereum/common/hexutil"
 	ethtypes "github.com/ethereum/go-ethereum/core/types"
 	"github.com/ethereum/go-ethereum/ethclient"
 	"github.com/ethereum/go-ethereum/rpc"
@@ -177,7 +178,7 @@ func (b *EthereumRPC) CreateMempool(chain bchain.BlockChain) (bchain.Mempool, er
 }
 
 // InitializeMempool creates subscriptions to newHeads and newPendingTransactions
-func (b *EthereumRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc) error {
+func (b *EthereumRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc, onNewTx bchain.OnNewTxFunc) error {
 	if b.Mempool == nil {
 		return errors.New("Mempool not created")
 	}
@@ -192,6 +193,7 @@ func (b *EthereumRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOu
 	}
 
 	b.Mempool.OnNewTxAddr = onNewTxAddr
+	b.Mempool.OnNewTx = onNewTx
 
 	if err = b.subscribeEvents(); err != nil {
 		return err
@@ -720,6 +722,18 @@ func (b *EthereumRPC) EthereumTypeEstimateGas(params map[string]interface{}) (ui
 	s, ok = getStringFromMap("data", params)
 	if ok && len(s) > 0 {
 		msg.Data = ethcommon.FromHex(s)
+	}
+	s, ok = getStringFromMap("value", params)
+	if ok && len(s) > 0 {
+		msg.Value, _ = hexutil.DecodeBig(s)
+	}
+	s, ok = getStringFromMap("gas", params)
+	if ok && len(s) > 0 {
+		msg.Gas, _ = hexutil.DecodeUint64(s)
+	}
+	s, ok = getStringFromMap("gasPrice", params)
+	if ok && len(s) > 0 {
+		msg.GasPrice, _ = hexutil.DecodeBig(s)
 	}
 	return b.client.EstimateGas(ctx, msg)
 }
