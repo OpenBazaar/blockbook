@@ -638,11 +638,6 @@ func onNewTxAddr(tx *bchain.Tx, desc bchain.AddressDescriptor) {
 }
 
 func onNewTx(tx *bchain.MempoolTx) {
-	defer func() {
-		if r := recover(); r != nil {
-			glog.Error("onNewTx recovered from panic: ", r)
-		}
-	}()
 	for _, c := range callbacksOnNewTx {
 		c(tx)
 	}

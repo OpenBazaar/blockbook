@@ -443,7 +443,7 @@ func (s *WebsocketServer) onRequest(c *websocketChannel, req *websocketReq) {
 			data = e
 		}
 	} else {
-		glog.V(1).Info("Client ", c.id, " onMessage ", req.Method, ": unknown method, data ", string(req.Params))
+		glog.Warning("Client ", c.id, " onMessage ", req.Method, ": unknown method, data ", string(req.Params))
 	}
 }
 
@@ -793,26 +793,30 @@ func (s *WebsocketServer) sendOnNewTxAddr(stringAddressDescriptor string, tx *ap
 			Address: addr[0],
 			Tx:      tx,
 		}
+		// get the list of subscriptions again, this time keep the lock
 		s.addressSubscriptionsLock.Lock()
 		defer s.addressSubscriptionsLock.Unlock()
 		as, ok := s.addressSubscriptions[stringAddressDescriptor]
 		if ok {
 			for c, id := range as {
-				c.DataOut(&websocketRes{
-					ID:   id,
-					Data: &data,
-				})
+				if c.IsAlive() {
+					c.out <- &websocketRes{
+						ID:   id,
+						Data: &data,
+					}
+				}
 			}
 			glog.Info("broadcasting new tx ", tx.Txid, ", addr ", addr[0], " to ", len(as), " channels")
 		}
 	}
 }
 
-func (s *WebsocketServer) getNewTxSubscriptions(tx *bchain.MempoolTx) map[string]struct{} {
+// OnNewTx is a callback that broadcasts info about a tx affecting subscribed address
+func (s *WebsocketServer) OnNewTx(tx *bchain.MempoolTx) {
 	// check if there is any subscription in inputs, outputs and erc20
-	s.addressSubscriptionsLock.Lock()
-	defer s.addressSubscriptionsLock.Unlock()
+	// release the lock immediately, GetTransactionFromMempoolTx is potentially slow
 	subscribed := make(map[string]struct{})
+	s.addressSubscriptionsLock.Lock()
 	for i := range tx.Vin {
 		sad := string(tx.Vin[i].AddrDesc)
 		if len(sad) > 0 {
@@ -850,12 +854,7 @@ func (s *WebsocketServer) getNewTxSubscriptions(tx *bchain.MempoolTx) map[string
 			}
 		}
 	}
-	return subscribed
-}
-
-// OnNewTx is a callback that broadcasts info about a tx affecting subscribed address
-func (s *WebsocketServer) OnNewTx(tx *bchain.MempoolTx) {
-	subscribed := s.getNewTxSubscriptions(tx)
+	s.addressSubscriptionsLock.Unlock()
 	if len(subscribed) > 0 {
 		atx, err := s.api.GetTransactionFromMempoolTx(tx)
 		if err != nil {
