@@ -15,7 +15,7 @@ import (
 	"github.com/filecoin-project/lotus/api"
 	"github.com/filecoin-project/lotus/api/apistruct"
 	"github.com/filecoin-project/lotus/chain/types"
-	"github.com/filecoin-project/specs-actors/actors/abi"
+	"github.com/filecoin-project/go-state-types/abi"
 	"github.com/golang/glog"
 	"github.com/ipfs/go-cid"
 	"github.com/multiformats/go-multiaddr"
@@ -107,12 +107,14 @@ func (f *FilecoinRPC) Initialize() error {
 		return err
 	}
 
-	fullNode, close, err := lotus.New(ma, f.ChainConfig.RPCAuthToken, 3)
+	buildFunc, err := lotus.NewBuilder(ma, f.ChainConfig.RPCAuthToken, 3)
 	if err != nil {
 		return err
 	}
-	f.fullNode = fullNode
-	f.close = close
+	f.fullNode, f.close, err = buildFunc()
+	if err != nil {
+		return err
+	}
 
 	chainChan := f.subscribeChain()
 
@@ -232,7 +234,7 @@ func (f *FilecoinRPC) CreateMempool(chain bchain.BlockChain) (bchain.Mempool, er
 }
 
 // initialize mempool, create ZeroMQ (or other) subscription
-func (f *FilecoinRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc) error {
+func (f *FilecoinRPC) InitializeMempool(addrDescForOutpoint bchain.AddrDescForOutpointFunc, onNewTxAddr bchain.OnNewTxAddrFunc, onNewTx bchain.OnNewTxFunc) error {
 	if f.Mempool == nil {
 		return errors.New("mempool not created")
 	}
@@ -778,7 +780,7 @@ func (f *FilecoinRPC) GetTransactionSpecific(tx *bchain.Tx) (json.RawMessage, er
 
 func (f *FilecoinRPC) EstimateSmartFee(blocks int, conservative bool) (big.Int, error) {
 	// TODO: what do we use for address, limit, and tipsetkey here?
-	fee, err := f.fullNode.MpoolEstimateGasPrice(context.Background(), uint64(blocks), address.Address{}, 0, types.TipSetKey{})
+	fee, err := f.fullNode.GasEstimateGasPremium(context.Background(), uint64(blocks), address.Address{}, 0, types.TipSetKey{})
 	if err != nil {
 		return big.Int{}, err
 	}
@@ -809,11 +811,11 @@ func (f *FilecoinRPC) SendRawTransaction(tx string) (string, error) {
 		return "", err
 	}
 
-	var msg types.SignedMessage
-	if err := msg.UnmarshalCBOR(bytes.NewReader(b)); err != nil {
+	sm, err := types.DecodeSignedMessage(b)
+	if err != nil {
 		return "", err
 	}
-	id, err := f.fullNode.MpoolPush(context.Background(), &msg)
+	id, err := f.fullNode.MpoolPush(context.Background(), sm)
 	if err != nil {
 		return "", err
 	}

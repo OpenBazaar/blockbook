@@ -1,15 +1,15 @@
 {
   "coin": {
-    "name": "Qtum Testnet",
-    "shortcut": "tQTUM",
-    "label": "Qtum Testnet",
-    "alias": "qtum_testnet"
+    "name": "DigiByte Testnet",
+    "shortcut": "TDGB",
+    "label": "DigiByte Testnet",
+    "alias": "digibyte_testnet"
   },
   "ports": {
-    "backend_rpc": 18088,
-    "backend_message_queue": 48388,
-    "blockbook_internal": 19088,
-    "blockbook_public": 19188
+    "backend_rpc": 18042,
+    "backend_message_queue": 48342,
+    "blockbook_internal": 19042,
+    "blockbook_public": 19142
   },
   "ipc": {
     "rpc_url_template": "http://127.0.0.1:{{.Ports.BackendRPC}}",
@@ -19,19 +19,19 @@
     "message_queue_binding_template": "tcp://127.0.0.1:{{.Ports.BackendMessageQueue}}"
   },
   "backend": {
-    "package_name": "backend-qtum-testnet",
+    "package_name": "backend-digibyte-testnet",
     "package_revision": "satoshilabs-1",
-    "system_user": "qtum",
-    "version": "0.19.1",
-    "binary_url": "https://github.com/qtumproject/qtum/releases/download/mainnet-ignition-v0.19.1/qtum-0.19.1-x86_64-linux-gnu.tar.gz",
+    "system_user": "digibyte",
+    "version": "7.17.2",
+    "binary_url": "https://github.com/digibyte/digibyte/releases/download/v7.17.2/digibyte-7.17.2-x86_64-linux-gnu.tar.gz",
     "verification_type": "sha256",
-    "verification_source": "044a8e535ff8a220dbcd1fe7fadae2429c123c97bd1fb5e7c50abc0e6640c8d4",
+    "verification_source": "caa8ecc42cbebbd2c43e742c7ecc2dd21d76a9e2db23676af428b67b131f6413",
     "extract_command": "tar -C backend --strip 1 -xf",
     "exclude_files": [
-      "bin/qtum-qt"
+      "bin/digibyte-qt"
     ],
-    "exec_command_template": "{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/bin/qtumd -datadir={{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend -conf={{.Env.BackendInstallPath}}/{{.Coin.Alias}}/{{.Coin.Alias}}.conf -pid=/run/{{.Coin.Alias}}/{{.Coin.Alias}}.pid",
-    "logrotate_files_template": "{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/testnet3/*.log",
+    "exec_command_template": "{{.Env.BackendInstallPath}}/{{.Coin.Alias}}/bin/digibyted -datadir={{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend -conf={{.Env.BackendInstallPath}}/{{.Coin.Alias}}/{{.Coin.Alias}}.conf -pid=/run/{{.Coin.Alias}}/{{.Coin.Alias}}.pid -rpcport=18042",
+    "logrotate_files_template": "{{.Env.BackendDataPath}}/{{.Coin.Alias}}/backend/testnet4/*.log",
     "postinst_script_template": "",
     "service_type": "forking",
     "service_additional_params_template": "",
@@ -40,13 +40,12 @@
     "server_config_file": "bitcoin_like.conf",
     "client_config_file": "bitcoin_like_client.conf",
     "additional_params": {
-      "deprecatedrpc": "estimatefee",
-      "logevents": "1"
+      "whitelist": "127.0.0.1"
     }
   },
   "blockbook": {
-    "package_name": "blockbook-qtum-testnet",
-    "system_user": "blockbook-qtum",
+    "package_name": "blockbook-digibyte-testnet",
+    "system_user": "blockbook-digibyte-testnet",
     "internal_binding_template": ":{{.Ports.BlockbookInternal}}",
     "public_binding_template": ":{{.Ports.BlockbookPublic}}",
     "explorer_url": "",
@@ -64,7 +63,7 @@
     }
   },
   "meta": {
-    "package_maintainer": "CodeFace",
-    "package_maintainer_email": "codeface@qtum.info"
+    "package_maintainer": "Martin Bohm",
+    "package_maintainer_email": "martin.bohm@satoshilabs.com"
   }
 }
