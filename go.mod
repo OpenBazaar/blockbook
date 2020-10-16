@@ -19,12 +19,10 @@ require (
 	github.com/facebookgo/ensure v0.0.0-20200202191622-63f1cf65ac4c // indirect
 	github.com/facebookgo/stack v0.0.0-20160209184415-751773369052 // indirect
 	github.com/facebookgo/subset v0.0.0-20200203212716-c811ad88dec4 // indirect
-	github.com/filecoin-project/chain-validation v0.0.6-0.20200615191232-6be1a8c6ed09 // indirect
+	github.com/filecoin-project/filecoin-ffi v0.30.4-0.20201006125140-a62d00da59d1 // indirect
 	github.com/filecoin-project/go-address v0.0.4
-	github.com/filecoin-project/go-state-types v0.0.0-20201003010437-c33112184a2b
-	github.com/filecoin-project/lotus v0.10.0
-	github.com/filecoin-project/sector-storage v0.0.0-20200630180318-4c1968f62a8f // indirect
-	github.com/filecoin-project/storage-fsm v0.0.0-20200625160832-379a4655b044 // indirect
+	github.com/filecoin-project/go-state-types v0.0.0-20201013222834-41ea465f274f
+	github.com/filecoin-project/lotus v0.10.2
 	github.com/gobuffalo/packr v1.13.7
 	github.com/gogo/protobuf v1.3.1
 	github.com/golang/glog v0.0.0-20160126235308-23def4e6c14b
@@ -40,13 +38,16 @@ require (
 	github.com/martinboehm/golang-socketio v0.0.0-20180414165752-f60b0a8befde
 	github.com/multiformats/go-multiaddr v0.3.1
 	github.com/niemeyer/pretty v0.0.0-20200227124842-a10e7caefd8e // indirect
-	github.com/pebbe/zmq4 v1.0.0
+	github.com/pebbe/zmq4 v1.2.1
 	github.com/prometheus/client_golang v1.6.0
 	github.com/schancel/cashaddr-converter v0.0.0-20180113210041-0a38f5822f79
 	github.com/tecbot/gorocksdb v0.0.0-20180907100951-214b6b7bc0f0
-	github.com/textileio/powergate v0.7.2
-	golang.org/x/crypto v0.0.0-20200622213623-75b288015ac9
-	google.golang.org/api v0.25.0 // indirect
+	github.com/textileio/powergate v0.9.1
+	github.com/xlab/c-for-go v0.0.0-20201012151547-73cdccf1de24 // indirect
+	golang.org/x/crypto v0.0.0-20201012173705-84dcc777aaee
+	golang.org/x/sys v0.0.0-20201015000850-e3ed0017c211 // indirect
+	golang.org/x/tools v0.0.0-20201016152635-c90119023dcc // indirect
 	gopkg.in/check.v1 v1.0.0-20200227125254-8fa46927fb4f // indirect
 	gopkg.in/mgo.v2 v2.0.0-20190816093944-a6b53ec6cb22 // indirect
+	modernc.org/golex v1.0.1 // indirect
 )
