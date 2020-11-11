@@ -224,7 +224,7 @@ func (f *FilecoinRPC) Initialize() error {
 
 				tipSet, err = f.fullNode.ChainGetTipSet(context.Background(), newTipset.Parents())
 				if err != nil {
-					glog.Error("Error fetching tipset %d", height - 1)
+					glog.Errorf("Error fetching tipset %d", height - 1)
 					continue
 				}
 				if uint64(tipSet.Height()) != height - 1 {
@@ -247,7 +247,7 @@ func (f *FilecoinRPC) Initialize() error {
 					})
 					f.dbMtx.Unlock()
 					if err != nil {
-						glog.Error("Error fetching tipset %d", height - 1)
+						glog.Errorf("Error fetching tipset %d", height - 1)
 						continue
 					}
 				}
