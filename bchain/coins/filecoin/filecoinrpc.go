@@ -578,6 +578,7 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 		}
 		header, err = f.GetBlockHeader(hash)
 		if err != nil {
+			glog.Errorf("***header for block %s not found in db", hash)
 			return nil, bchain.ErrBlockNotFound
 		}
 		height = header.Height
@@ -603,6 +604,7 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	})
 	f.dbMtx.Unlock()
 	if err != nil {
+		glog.Errorf("*** tipset bytes for block %d not found in db", height)
 		return nil, bchain.ErrBlockNotFound
 	}
 
@@ -616,7 +618,8 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 
 		tipSet, err := f.fullNode.ChainGetTipSet(context.Background(), tipSetKey)
 		if err != nil {
-			return nil, err
+			glog.Errorf("*** non nil tipset for block %d err querying powergate: %s", height, err.Error())
+			return nil, bchain.ErrBlockNotFound
 		}
 
 		for _, id := range tipSet.Cids() {
@@ -633,7 +636,8 @@ func (f *FilecoinRPC) GetBlock(hash string, height uint32) (*bchain.Block, error
 	if header == nil {
 		header, err = f.GetBlockHeader(hash)
 		if err != nil {
-			return nil, err
+			glog.Errorf("**** header for block %d not found in db", height)
+			return nil, bchain.ErrBlockNotFound
 		}
 	}
 

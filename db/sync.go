@@ -265,7 +265,10 @@ func (w *SyncWorker) ConnectBlocksParallel(lower, higher uint32) error {
 			case b := <-bch[(lastBlock+1)%uint32(w.syncWorkers)]:
 				if b == nil {
 					// channel is closed and empty - work is done
+					glog.Info("bch chan is nil, breaking loop")
 					break WriteBlockLoop
+				} else {
+					glog.Infof("***Popped block %d off bch chan, lastBlock %d", b.Height, lastBlock)
 				}
 				if b.Height != lastBlock+1 {
 					glog.Fatal("writeBlockWorker skipped block, expected block ", lastBlock+1, ", new block ", b.Height)
@@ -292,6 +295,7 @@ func (w *SyncWorker) ConnectBlocksParallel(lower, higher uint32) error {
 	GetBlockLoop:
 		for hh := range hch {
 			for {
+				glog.Infof("***Worker getting block from filecoin: %s:%d", hh.hash, hh.height)
 				block, err = w.chain.GetBlock(hh.hash, hh.height)
 				if err != nil {
 					// signal came while looping in the error loop
@@ -303,6 +307,7 @@ func (w *SyncWorker) ConnectBlocksParallel(lower, higher uint32) error {
 					w.metrics.IndexResyncErrors.With(common.Labels{"error": "failure"}).Inc()
 					time.Sleep(time.Millisecond * 500)
 				} else {
+					glog.Infof("***Worker got block from filecoin: %s:%d", block.Hash, block.Height)
 					break
 				}
 			}
