@@ -118,9 +118,72 @@ func (f *FilecoinRPC) Initialize() error {
 
 	chainChan := f.subscribeChain()
 
+	if err := f.syncBlocksFromTip(); err != nil {
+		return err
+	}
+
+	go func() {
+		for {
+			select {
+			case ts, ok := <-chainChan:
+				var (
+					height uint64
+					newTipset *types.TipSet
+				)
+				for _, tipset := range ts {
+					if uint64(tipset.Val.Height()) > height {
+						height = uint64(tipset.Val.Height())
+						newTipset = tipset.Val
+					}
+				}
+
+				tipSet, err := f.fullNode.ChainGetTipSet(context.Background(), newTipset.Parents())
+				if err != nil {
+					glog.Errorf("Error fetching tipset %d", height - 1)
+					continue
+				}
+				if uint64(tipSet.Height()) != height - 1 {
+					f.dbMtx.Lock()
+					err := f.db.Update(func(tx *badger.Txn) error {
+						h := height - 1
+						for h > uint64(tipSet.Height()) {
+							key := make([]byte, 8)
+							binary.BigEndian.PutUint64(key, h)
+							nilTs := createNilTipsetKey(h)
+							if err := tx.Set(key, nilTs); err != nil {
+								return err
+							}
+							if err := tx.Set(nilTs, key); err != nil {
+								return err
+							}
+							h--
+						}
+						return nil
+					})
+					f.dbMtx.Unlock()
+					if err != nil {
+						glog.Errorf("Error fetching tipset %d", height - 1)
+						continue
+					}
+				}
+
+				f.pushHandler(bchain.NotificationNewBlock)
+				if !ok {
+					chainChan = f.subscribeChain()
+				}
+			case <-f.shutdown:
+				return
+			}
+		}
+	}()
+
+	return nil
+}
+
+func (f *FilecoinRPC) syncBlocksFromTip() error {
 	var startHeight, height, headHeight uint64
 	f.dbMtx.Lock()
-	err = f.db.View(func(tx *badger.Txn) error {
+	err := f.db.View(func(tx *badger.Txn) error {
 		item, err := tx.Get([]byte(dbHeadKey))
 		if err != nil && err != badger.ErrKeyNotFound {
 			return err
@@ -206,62 +269,6 @@ func (f *FilecoinRPC) Initialize() error {
 	if err != nil {
 		return err
 	}
-
-	go func() {
-		for {
-			select {
-			case ts, ok := <-chainChan:
-				var (
-					height uint64
-					newTipset *types.TipSet
-				)
-				for _, tipset := range ts {
-					if uint64(tipset.Val.Height()) > height {
-						height = uint64(tipset.Val.Height())
-						newTipset = tipset.Val
-					}
-				}
-
-				tipSet, err = f.fullNode.ChainGetTipSet(context.Background(), newTipset.Parents())
-				if err != nil {
-					glog.Errorf("Error fetching tipset %d", height - 1)
-					continue
-				}
-				if uint64(tipSet.Height()) != height - 1 {
-					f.dbMtx.Lock()
-					err := f.db.Update(func(tx *badger.Txn) error {
-						h := height - 1
-						for h > uint64(tipSet.Height()) {
-							key := make([]byte, 8)
-							binary.BigEndian.PutUint64(key, h)
-							nilTs := createNilTipsetKey(h)
-							if err := tx.Set(key, nilTs); err != nil {
-								return err
-							}
-							if err := tx.Set(nilTs, key); err != nil {
-								return err
-							}
-							h--
-						}
-						return nil
-					})
-					f.dbMtx.Unlock()
-					if err != nil {
-						glog.Errorf("Error fetching tipset %d", height - 1)
-						continue
-					}
-				}
-
-				f.pushHandler(bchain.NotificationNewBlock)
-				if !ok {
-					chainChan = f.subscribeChain()
-				}
-			case <-f.shutdown:
-				return
-			}
-		}
-	}()
-
 	return nil
 }
 
@@ -414,6 +421,11 @@ func (f *FilecoinRPC) GetBestBlockHeight() (uint32, error) {
 }
 
 func (f *FilecoinRPC) GetBlockHash(height uint32) (string, error) {
+	// First make sure we're synced to the tip
+	if err := f.syncBlocksFromTip(); err != nil {
+		return "", err
+	}
+
 	var blockHash string
 	f.dbMtx.Lock()
 	err := f.db.View(func(tx *badger.Txn) error {
