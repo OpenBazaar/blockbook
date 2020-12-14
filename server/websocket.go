@@ -811,6 +811,38 @@ func (s *WebsocketServer) sendOnNewTxAddr(stringAddressDescriptor string, tx *ap
 	}
 }
 
+func (s *WebsocketServer) sendOnNewTxAddr(stringAddressDescriptor string, tx *api.Tx) {
+	addrDesc := bchain.AddressDescriptor(stringAddressDescriptor)
+	addr, _, err := s.chainParser.GetAddressesFromAddrDesc(addrDesc)
+	if err != nil {
+		glog.Error("GetAddressesFromAddrDesc error ", err, " for ", addrDesc)
+		return
+	}
+	if len(addr) == 1 {
+		data := struct {
+			Address string  `json:"address"`
+			Tx      *api.Tx `json:"tx"`
+		}{
+			Address: addr[0],
+			Tx:      tx,
+		}
+		// get the list of subscriptions again, this time keep the lock
+		s.addressSubscriptionsLock.Lock()
+		defer s.addressSubscriptionsLock.Unlock()
+		as, ok := s.addressSubscriptions[stringAddressDescriptor]
+		if ok {
+			for c, id := range as {
+				if c.IsAlive() {
+					c.out <- &websocketRes{
+						ID:   id,
+						Data: &data,
+					}
+				}
+			}
+			glog.Info("broadcasting new tx ", tx.Txid, ", addr ", addr[0], " to ", len(as), " channels")
+		}
+	}
+}>>>>> bbupdate
 // OnNewTx is a callback that broadcasts info about a tx affecting subscribed address
 func (s *WebsocketServer) OnNewTx(tx *bchain.MempoolTx) {
 	// check if there is any subscription in inputs, outputs and erc20
